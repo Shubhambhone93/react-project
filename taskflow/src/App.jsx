@@ -1,186 +1,311 @@
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
 import './App.css';
 
+const API_URL =
+  'https://59y6z9ld50.execute-api.ap-southeast-2.amazonaws.com';
+
 function App() {
-const [tasks, setTasks] = useState([
-{ id: 1, title: 'Learn React Basics', completed: true },
-{ id: 2, title: 'Build TaskFlow Dashboard', completed: false },
-{ id: 3, title: 'Learn AWS Lambda', completed: false },
-]);
+  const [tasks, setTasks] = useState([]);
+  const [title, setTitle] = useState('');
+  const [filter, setFilter] = useState('All');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-const [title, setTitle] = useState('');
-const [filter, setFilter] = useState('All');
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        const response = await fetch(`${API_URL}/tasks`);
 
-const addTask = (e) => {
-e.preventDefault();
+        if (!response.ok) {
+          throw new Error('Failed to load tasks');
+        }
 
-if (!title.trim()) return;
+        const data = await response.json();
+        setTasks(data);
+      } catch (err) {
+        console.error('Fetch error:', err);
+        setError('Failed to load tasks. Please check the API.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-setTasks([
-  ...tasks,
-  {
-    id: Date.now(),
-    title: title.trim(),
-    completed: false,
-  },
-]);
+    fetchTasks();
+  }, []);
 
-setTitle('');
+  const addTask = async (e) => {
+    e.preventDefault();
 
-};
+    if (!title.trim() || saving) return;
 
-const toggleTask = (id) => {
-setTasks(
-tasks.map((task) =>
-task.id === id
-? { ...task, completed: !task.completed }
-: task
-)
-);
-};
+    try {
+      setSaving(true);
+      setError('');
 
-const deleteTask = (id) => {
-setTasks(tasks.filter((task) => task.id !== id));
-};
+      const response = await fetch(`${API_URL}/tasks`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: title.trim(),
+        }),
+      });
 
-const filteredTasks = tasks.filter((task) => {
-if (filter === 'Completed') return task.completed;
-if (filter === 'Pending') return !task.completed;
-return true;
-});
+      if (!response.ok) {
+        throw new Error('Failed to add task');
+      }
 
-const completedCount = tasks.filter(
-(task) => task.completed
-).length;
+      const newTask = await response.json();
 
-return (
-<div className="app">
-<aside className="sidebar">
-<h2 className="brand">✦ TaskFlow</h2>
+      setTasks((previousTasks) => [
+        ...previousTasks,
+        newTask,
+      ]);
 
-    <p className="menu-label">WORKSPACE</p>
+      setTitle('');
+    } catch (err) {
+      console.error('Add error:', err);
+      setError('Failed to save task. Please check the API.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
-    <div className="menu-item active">▦ Dashboard</div>
-    <div className="menu-item">✓ My Tasks</div>
-    <div className="menu-item">⚙ Settings</div>
+  const toggleTask = async (task) => {
+    try {
+      setError('');
 
-    <div className="sidebar-bottom">
-      <div className="avatar">S</div>
-      <div>
-        <strong>Student</strong>
-        <p>Personal Workspace</p>
-      </div>
-    </div>
-  </aside>
+      const response = await fetch(
+        `${API_URL}/${encodeURIComponent(task.id)}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            completed: !task.completed,
+          }),
+        }
+      );
 
-  <main className="main">
-    <header className="topbar">
-      <span>Workspace / Dashboard</span>
-      <span className="date">Your productivity space ✨</span>
-    </header>
+      if (!response.ok) {
+        throw new Error('Failed to update task');
+      }
 
-    <section className="welcome">
-      <div>
-        <p className="eyebrow">YOUR WORKSPACE</p>
-        <h1>Good day! 👋</h1>
-        <p>Stay organized and get things done.</p>
-      </div>
+      const updatedTask = await response.json();
 
-      <div className="welcome-icon">✦</div>
-    </section>
+      setTasks((previousTasks) =>
+        previousTasks.map((item) =>
+          item.id === task.id ? updatedTask : item
+        )
+      );
+    } catch (err) {
+      console.error('Update error:', err);
+      setError('Failed to update task. Please check the API.');
+    }
+  };
 
-    <section className="stats">
-      <div className="stat-card">
-        <span className="stat-icon purple">▦</span>
-        <p>Total Tasks</p>
-        <h2>{tasks.length}</h2>
-        <small>All your tasks</small>
-      </div>
+  const deleteTask = async (id) => {
+    try {
+      setError('');
 
-      <div className="stat-card">
-        <span className="stat-icon green">✓</span>
-        <p>Completed</p>
-        <h2>{completedCount}</h2>
-        <small>Tasks finished</small>
-      </div>
+      const response = await fetch(
+        `${API_URL}/${encodeURIComponent(id)}`,
+        {
+          method: 'DELETE',
+        }
+      );
 
-      <div className="stat-card">
-        <span className="stat-icon orange">◷</span>
-        <p>Pending</p>
-        <h2>{tasks.length - completedCount}</h2>
-        <small>Tasks remaining</small>
-      </div>
-    </section>
+      if (!response.ok) {
+        throw new Error('Failed to delete task');
+      }
 
-    <section className="task-section">
-      <div className="section-heading">
-        <div>
-          <h2>My Tasks</h2>
-          <p>Manage your daily activities</p>
+      setTasks((previousTasks) =>
+        previousTasks.filter((task) => task.id !== id)
+      );
+    } catch (err) {
+      console.error('Delete error:', err);
+      setError('Failed to delete task. Please check the API.');
+    }
+  };
+
+  const filteredTasks = tasks.filter((task) => {
+    if (filter === 'Completed') return task.completed;
+    if (filter === 'Pending') return !task.completed;
+
+    return true;
+  });
+
+  const completedCount = tasks.filter(
+    (task) => task.completed
+  ).length;
+
+  return (
+    <div className="app">
+      <aside className="sidebar">
+        <h2 className="brand">✦ TaskFlow</h2>
+
+        <p className="menu-label">WORKSPACE</p>
+
+        <div className="menu-item active">▦ Dashboard</div>
+        <div className="menu-item">✓ My Tasks</div>
+        <div className="menu-item">⚙ Settings</div>
+
+        <div className="sidebar-bottom">
+          <div className="avatar">S</div>
+
+          <div>
+            <strong>Student</strong>
+            <p>Personal Workspace</p>
+          </div>
         </div>
-      </div>
+      </aside>
 
-      <form className="add-task" onSubmit={addTask}>
-        <input
-          type="text"
-          placeholder="What do you need to do?"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
+      <main className="main">
+        <header className="topbar">
+          <span>Workspace / Dashboard</span>
+          <span className="date">
+            Your productivity space ✨
+          </span>
+        </header>
 
-        <button type="submit">+ Add Task</button>
-      </form>
+        <section className="welcome">
+          <div>
+            <p className="eyebrow">YOUR WORKSPACE</p>
+            <h1>Good day! 👋</h1>
+            <p>Stay organized and get things done.</p>
+          </div>
 
-      <div className="filters">
-        {['All', 'Pending', 'Completed'].map((item) => (
-          <button
-            key={item}
-            className={filter === item ? 'filter active-filter' : 'filter'}
-            onClick={() => setFilter(item)}
-          >
-            {item}
-          </button>
-        ))}
-      </div>
+          <div className="welcome-icon">✦</div>
+        </section>
 
-      <div className="task-list">
-        {filteredTasks.map((task) => (
-          <div className="task-row" key={task.id}>
+        <section className="stats">
+          <div className="stat-card">
+            <span className="stat-icon purple">▦</span>
+            <p>Total Tasks</p>
+            <h2>{tasks.length}</h2>
+            <small>All your tasks</small>
+          </div>
+
+          <div className="stat-card">
+            <span className="stat-icon green">✓</span>
+            <p>Completed</p>
+            <h2>{completedCount}</h2>
+            <small>Tasks finished</small>
+          </div>
+
+          <div className="stat-card">
+            <span className="stat-icon orange">◷</span>
+            <p>Pending</p>
+            <h2>{tasks.length - completedCount}</h2>
+            <small>Tasks remaining</small>
+          </div>
+        </section>
+
+        <section className="task-section">
+          <div className="section-heading">
+            <div>
+              <h2>My Tasks</h2>
+              <p>Manage your daily activities</p>
+            </div>
+          </div>
+
+          {error && <p role="alert">{error}</p>}
+
+          <form className="add-task" onSubmit={addTask}>
             <input
-              type="checkbox"
-              checked={task.completed}
-              onChange={() => toggleTask(task.id)}
+              type="text"
+              placeholder="What do you need to do?"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
             />
 
-            <span className={task.completed ? 'task-done' : ''}>
-              {task.title}
-            </span>
-
-            <span className={task.completed ? 'status done' : 'status pending'}>
-              {task.completed ? 'Completed' : 'Pending'}
-            </span>
-
-            <button
-              className="delete-button"
-              onClick={() => deleteTask(task.id)}
-              aria-label={`Delete ${task.title}`}
-            >
-              ✕
+            <button type="submit" disabled={saving}>
+              {saving ? 'Saving...' : '+ Add Task'}
             </button>
+          </form>
+
+          <div className="filters">
+            {['All', 'Pending', 'Completed'].map((item) => (
+              <button
+                key={item}
+                type="button"
+                className={
+                  filter === item
+                    ? 'filter active-filter'
+                    : 'filter'
+                }
+                onClick={() => setFilter(item)}
+              >
+                {item}
+              </button>
+            ))}
           </div>
-        ))}
 
-        {filteredTasks.length === 0 && (
-          <p className="empty-state">No tasks found. Add a new task!</p>
-        )}
-      </div>
-    </section>
+          <div className="task-list">
+            {loading ? (
+              <p className="empty-state">Loading tasks...</p>
+            ) : (
+              <>
+                {filteredTasks.map((task) => (
+                  <div className="task-row" key={task.id}>
+                    <input
+                      type="checkbox"
+                      checked={task.completed}
+                      onChange={() => toggleTask(task)}
+                    />
 
-    <footer>TaskFlow · Make every day productive.</footer>
-  </main>
-</div>
+                    <span
+                      className={
+                        task.completed ? 'task-done' : ''
+                      }
+                    >
+                      {task.title}
+                    </span>
 
-);
+                    <span
+                      className={
+                        task.completed
+                          ? 'status done'
+                          : 'status pending'
+                      }
+                    >
+                      {task.completed
+                        ? 'Completed'
+                        : 'Pending'}
+                    </span>
+
+                    <button
+                      type="button"
+                      className="delete-button"
+                      onClick={() => deleteTask(task.id)}
+                      aria-label={`Delete ${task.title}`}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+
+                {filteredTasks.length === 0 && (
+                  <p className="empty-state">
+                    No tasks found. Add a new task!
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        </section>
+
+        <footer>
+          TaskFlow · Make every day productive.
+        </footer>
+      </main>
+    </div>
+  );
 }
 
 export default App;
+

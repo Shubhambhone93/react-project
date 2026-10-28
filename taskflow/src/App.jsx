@@ -79,7 +79,7 @@ function App() {
       setError('');
 
       const response = await fetch(
-        `${API_URL}/${encodeURIComponent(task.id)}`,
+        `${API_URL}/tasks/${encodeURIComponent(task.id)}`,
         {
           method: 'PUT',
           headers: {
@@ -113,7 +113,7 @@ function App() {
       setError('');
 
       const response = await fetch(
-        `${API_URL}/${encodeURIComponent(id)}`,
+        `${API_URL}/tasks/${encodeURIComponent(task.id)}`,
         {
           method: 'DELETE',
         }
